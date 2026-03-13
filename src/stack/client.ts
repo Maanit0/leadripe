@@ -1,13 +1,9 @@
-import "server-only";
+import { StackClientApp } from "@stackframe/stack";
 
-import { StackServerApp } from "@stackframe/stack";
-
-export const stackServerApp = new StackServerApp({
+export const stackClientApp = new StackClientApp({
+  // Next.js auto-detects NEXT_PUBLIC_STACK_PROJECT_ID and
+  // NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY from env vars
   tokenStore: "nextjs-cookie",
-  urls: {
-    afterSignIn: "/",
-    afterSignOut: "/",
-  },
   oauthScopesOnSignIn: {
     google: [
       "https://www.googleapis.com/auth/gmail.send",

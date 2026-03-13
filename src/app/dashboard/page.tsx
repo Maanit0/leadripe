@@ -1,17 +1,125 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useUser, UserButton } from "@stackframe/stack";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Settings } from "lucide-react";
-import { DEALS, STAGE_CONFIG, sortDealsByUrgency } from "@/lib/leads-data";
+import { Settings, RefreshCw } from "lucide-react";
+import { db } from "@/lib/db";
 
-const sortedDeals = sortDealsByUrgency(DEALS);
+// Extended stage config to cover all HubSpot-mapped stages
+const STAGE_CONFIG: Record<string, { color: string; bg: string; dot: string; label: string }> = {
+  replied_interested: {
+    color: "text-green-700", bg: "bg-green-50 border-green-200", dot: "bg-green-500", label: "Replied / interested",
+  },
+  demo_booked: {
+    color: "text-blue-700", bg: "bg-blue-50 border-blue-200", dot: "bg-blue-500", label: "Demo booked",
+  },
+  demo_done: {
+    color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200", dot: "bg-indigo-500", label: "Demo done",
+  },
+  proposal_sent: {
+    color: "text-amber-700", bg: "bg-amber-50 border-amber-200", dot: "bg-amber-500", label: "Proposal sent",
+  },
+  gone_silent: {
+    color: "text-red-700", bg: "bg-red-50 border-red-200", dot: "bg-red-500", label: "Gone silent",
+  },
+  stalled: {
+    color: "text-gray-700", bg: "bg-gray-50 border-gray-200", dot: "bg-gray-500", label: "Stalled",
+  },
+  nurture: {
+    color: "text-purple-700", bg: "bg-purple-50 border-purple-200", dot: "bg-purple-500", label: "Nurture",
+  },
+  closed_won: {
+    color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", dot: "bg-emerald-500", label: "Closed won",
+  },
+  closed_lost: {
+    color: "text-gray-500", bg: "bg-gray-50 border-gray-200", dot: "bg-gray-400", label: "Closed lost",
+  },
+};
+
+const DEFAULT_STAGE = {
+  color: "text-gray-700", bg: "bg-gray-50 border-gray-200", dot: "bg-gray-500", label: "Unknown",
+};
+
+// Stages that need follow-up, sorted by urgency
+const ACTIVE_STAGES = ["gone_silent", "stalled", "proposal_sent", "demo_done", "demo_booked", "replied_interested"];
+const STAGE_URGENCY: Record<string, number> = Object.fromEntries(
+  ACTIVE_STAGES.map((s, i) => [s, i])
+);
+
+const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 
 function DashboardContent() {
   const user = useUser();
   const router = useRouter();
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const autoSyncAttempted = useRef(false);
+  const gmailWatchAttempted = useRef(false);
+
+  // Query deals from InstantDB for the current user
+  const { data, isLoading } = db.useQuery(
+    user
+      ? {
+          deals: {
+            $: { where: { "user.id": user.id } },
+          },
+          profiles: {
+            $: { where: { "user.id": user.id } },
+          },
+        }
+      : null
+  );
+
+  const deals = data?.deals ?? [];
+  const profile = data?.profiles?.[0];
+
+  // Sort deals by urgency
+  const activeDealsSorted = [...deals]
+    .filter((d) => ACTIVE_STAGES.includes(d.stage))
+    .sort((a, b) => {
+      const stageA = STAGE_URGENCY[a.stage] ?? 99;
+      const stageB = STAGE_URGENCY[b.stage] ?? 99;
+      if (stageA !== stageB) return stageA - stageB;
+      return (b.daysSinceLastTouch ?? 0) - (a.daysSinceLastTouch ?? 0);
+    });
+
+  const triggerSync = useCallback(async () => {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const res = await fetch("/api/hubspot/sync", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        setSyncError(data.error ?? "Sync failed");
+      }
+    } catch {
+      setSyncError("Network error during sync");
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
+  // Auto-sync on dashboard load if last sync > 30 min ago
+  useEffect(() => {
+    if (!user || autoSyncAttempted.current || isLoading) return;
+    autoSyncAttempted.current = true;
+
+    if (!profile?.hubspotAccessToken) return; // HubSpot not connected
+
+    const lastSynced = profile?.hubspotLastSynced ?? 0;
+    if (Date.now() - lastSynced > THIRTY_MINUTES_MS) {
+      triggerSync();
+    }
+  }, [user, profile, isLoading, triggerSync]);
+
+  // Register Gmail push notifications (once per session)
+  useEffect(() => {
+    if (!user || gmailWatchAttempted.current) return;
+    gmailWatchAttempted.current = true;
+    fetch("/api/gmail/watch", { method: "POST" }).catch(() => {});
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -32,6 +140,14 @@ function DashboardContent() {
           <span className="font-semibold text-gray-950 text-sm">LeadRipe</span>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={triggerSync}
+            disabled={syncing || !profile?.hubspotAccessToken}
+            title={!profile?.hubspotAccessToken ? "Connect HubSpot in Settings" : "Sync deals from HubSpot"}
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-500 disabled:opacity-30"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+          </button>
           <Link
             href="/settings"
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
@@ -44,20 +160,35 @@ function DashboardContent() {
 
       {/* Main */}
       <main className="max-w-2xl mx-auto px-6 py-10">
+        {/* Sync status */}
+        {syncError && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            {syncError}
+          </div>
+        )}
+
         {/* Page title */}
         <div className="mb-8">
           <h1 className="text-xl font-semibold text-gray-950">
-            {sortedDeals.length} deals need follow-up today
+            {isLoading
+              ? "Loading deals..."
+              : activeDealsSorted.length > 0
+                ? `${activeDealsSorted.length} deal${activeDealsSorted.length === 1 ? "" : "s"} need follow-up`
+                : "No deals need follow-up"}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Sorted by urgency. Start from the top.
+            {activeDealsSorted.length > 0
+              ? "Sorted by urgency. Start from the top."
+              : profile?.hubspotAccessToken
+                ? "All caught up, or sync to check for new deals."
+                : "Connect HubSpot in Settings to import your deals."}
           </p>
         </div>
 
         {/* Deal list */}
         <div className="flex flex-col gap-3">
-          {sortedDeals.map((deal) => {
-            const stage = STAGE_CONFIG[deal.stage];
+          {activeDealsSorted.map((deal) => {
+            const stageConfig = STAGE_CONFIG[deal.stage] ?? DEFAULT_STAGE;
             return (
               <div
                 key={deal.id}
@@ -67,27 +198,26 @@ function DashboardContent() {
                   <div className="flex flex-col gap-2 min-w-0">
                     {/* Name + company */}
                     <div>
-                      <p className="text-sm font-semibold text-gray-950">{deal.name}</p>
+                      <p className="text-sm font-semibold text-gray-950">{deal.contactName}</p>
                       <p className="text-xs text-gray-500">
-                        {deal.role} · {deal.company}
+                        {deal.contactRole ? `${deal.contactRole} · ` : ""}
+                        {deal.companyName}
                       </p>
                     </div>
 
                     {/* Stage pill */}
                     <div className="flex items-center gap-2">
                       <span
-                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border ${
-                          stage.bg
-                        } ${stage.color}`}
+                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border ${stageConfig.bg} ${stageConfig.color}`}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${stage.dot}`} />
-                        {deal.stage}
+                        <span className={`w-1.5 h-1.5 rounded-full ${stageConfig.dot}`} />
+                        {stageConfig.label}
                       </span>
                     </div>
 
                     {/* Last touch */}
                     <p className="text-xs text-gray-500">
-                      {deal.daysSince} days since last reply
+                      {deal.daysSinceLastTouch} day{deal.daysSinceLastTouch === 1 ? "" : "s"} since last touch
                     </p>
                   </div>
 

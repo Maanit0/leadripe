@@ -4,53 +4,69 @@ import { i } from "@instantdb/react";
 
 const schema = i.schema({
   entities: {
-    // InstantDB's built-in user entity - required for custom authentication
-    // When using Stack Auth with InstantDB, user emails/IDs are stored here
     $users: i.entity({
       email: i.any().unique().indexed(),
     }),
-    // Add your entities here
-    // Example:
-    // messages: i.entity({
-    //   content: i.string(),
-    //   createdAt: i.number().indexed(),
-    // }),
-    // chats: i.entity({
-    //   name: i.string(),
-    //   lastMessageAt: i.number().indexed(),
-    // }),
+
+    // User profile: stores integration tokens and sync metadata
+    profiles: i.entity({
+      hubspotAccessToken: i.string().optional(), // Personal access token (pasted by user)
+      hubspotLastSynced: i.number().optional().indexed(), // epoch ms
+      gmailAccessToken: i.string().optional(), // Synced from Stack Auth Google OAuth
+      lastHistoryId: i.string().optional(), // Gmail Pub/Sub history cursor
+      notionAccessToken: i.string().optional(),
+      calendlyLink: i.string().optional(),
+      createdAt: i.number().indexed(),
+    }),
+
+    // Deals synced from HubSpot
+    deals: i.entity({
+      hubspotDealId: i.string().unique().indexed(),
+      contactName: i.string(),
+      contactEmail: i.string().optional(),
+      contactRole: i.string().optional(),
+      companyName: i.string(),
+      stage: i.string().indexed(), // replied_interested, demo_booked, demo_done, proposal_sent, gone_silent, stalled
+      lastTouchSummary: i.string().optional(),
+      daysSinceLastTouch: i.number(),
+      notionContext: i.string().optional(),
+      hsLastModifiedDate: i.string().optional(),
+      flaggedForReview: i.any().optional().indexed(), // boolean - flagged by intent classifier
+      flagReason: i.string().optional(),
+      createdAt: i.number().indexed(),
+      updatedAt: i.number().indexed(),
+    }),
+
+    // Messages (outbound drafts and inbound replies)
+    messages: i.entity({
+      body: i.string(),
+      tone: i.string().optional(), // warm, short, bold
+      sentAt: i.number().optional(),
+      direction: i.string().indexed(), // outbound, inbound
+      intentClassification: i.string().optional(),
+      gmailMessageId: i.string().optional(), // Gmail API message ID
+      gmailThreadId: i.string().optional().indexed(), // Gmail thread ID for reply tracking
+      createdAt: i.number().indexed(),
+    }),
   },
   links: {
-    // Add your links here
-    // InstantDB relies on a graph-based linking system.
-    // Always use db.tx.entity[id].link({ label: otherId }) in transactions.
-    //
-    // IMPORTANT: When creating entities that belong to users:
-    // - Define a link between your entity and $users
-    // - Use .link({ user: userId }) when creating the entity
-    // - This enables permission rules like: auth.id in data.ref('user.id')
-    //
-    // Example for profiles linked to users:
-    // profileUser: {
-    //   forward: { on: "profiles", has: "one", label: "user" },
-    //   reverse: { on: "$users", has: "one", label: "profile" },
-    // },
-    //
-    // Example for posts with many-to-one relationship:
-    // chatMessages: {
-    //   forward: { on: "chats", has: "many", label: "messages" },
-    //   reverse: { on: "messages", has: "one", label: "chat" },
-    // },
+    // Profile belongs to a user (1:1)
+    profileUser: {
+      forward: { on: "profiles", has: "one", label: "user" },
+      reverse: { on: "$users", has: "one", label: "profile" },
+    },
+    // Deal belongs to a user (many:1)
+    dealUser: {
+      forward: { on: "deals", has: "one", label: "user" },
+      reverse: { on: "$users", has: "many", label: "deals" },
+    },
+    // Message belongs to a deal (many:1)
+    messageDeal: {
+      forward: { on: "messages", has: "one", label: "deal" },
+      reverse: { on: "deals", has: "many", label: "messages" },
+    },
   },
-  rooms: {
-    // Add your rooms for real-time presence here
-    // Example:
-    // chat: {
-    //   presence: i.entity({
-    //     name: i.string(),
-    //   }),
-    // },
-  },
+  rooms: {},
 });
 
 // This helps Typescript display nicer intellisense
