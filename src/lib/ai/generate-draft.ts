@@ -14,7 +14,7 @@ export async function generateDraft(
 
   // Fetch Notion context live if not already provided
   let notionContext = input.notion_context ?? "";
-  if (!notionContext && input.userId && input.company_name) {
+  if (!notionContext.trim() && input.userId) {
     try {
       notionContext = await getNotionContext(input.userId, input.company_name, input.contact_name) ?? "";
       console.log(`[draft] Notion context for ${input.contact_name} (${input.company_name}): ${notionContext ? `${notionContext.length} chars` : "NOT FOUND"}`);

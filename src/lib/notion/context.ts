@@ -9,6 +9,9 @@ interface NotionBlock {
   bulleted_list_item?: { rich_text: Array<{ plain_text: string }> };
   numbered_list_item?: { rich_text: Array<{ plain_text: string }> };
   to_do?: { rich_text: Array<{ plain_text: string }> };
+  toggle?: { rich_text: Array<{ plain_text: string }> };
+  callout?: { rich_text: Array<{ plain_text: string }> };
+  quote?: { rich_text: Array<{ plain_text: string }> };
 }
 
 function extractBlockText(block: NotionBlock): string {
@@ -19,7 +22,10 @@ function extractBlockText(block: NotionBlock): string {
     block.heading_3?.rich_text ??
     block.bulleted_list_item?.rich_text ??
     block.numbered_list_item?.rich_text ??
-    block.to_do?.rich_text;
+    block.to_do?.rich_text ??
+    block.toggle?.rich_text ??
+    block.callout?.rich_text ??
+    block.quote?.rich_text;
 
   if (!richText) return "";
 
@@ -33,7 +39,8 @@ function extractBlockText(block: NotionBlock): string {
 
 /**
  * Searches Notion for context about a deal.
- * Searches by contact name and company name.
+ * First tries querying databases by Contact Name property,
+ * then falls back to general search by contact/company name.
  * Returns plain text summary (max 4000 chars) or null.
  */
 export async function getNotionContext(
@@ -49,11 +56,30 @@ export async function getNotionContext(
   });
 
   const token = profiles[0]?.notionAccessToken;
-  if (!token) return null;
+  if (!token) {
+    console.log("[notion] No token found for user");
+    return null;
+  }
 
-  // Search by contact name first (more specific), then company name
-  const pageId = await searchNotion(token, contactName) ?? await searchNotion(token, companyName);
-  if (!pageId) return null;
+  // Strategy 1: Find databases and query by Contact Name property
+  let pageId = await queryDatabaseByContactName(token, contactName);
+
+  // Strategy 2: Fall back to general search
+  if (!pageId) {
+    console.log(`[notion] Database query found nothing, trying search for "${contactName}"`);
+    pageId = await searchNotion(token, contactName);
+  }
+  if (!pageId) {
+    console.log(`[notion] Search for contact name found nothing, trying "${companyName}"`);
+    pageId = await searchNotion(token, companyName);
+  }
+
+  if (!pageId) {
+    console.log(`[notion] No page found for ${contactName} / ${companyName}`);
+    return null;
+  }
+
+  console.log(`[notion] Found page ${pageId} for ${contactName}`);
 
   // Fetch page blocks (up to 100)
   try {
@@ -67,7 +93,10 @@ export async function getNotionContext(
       }
     );
 
-    if (!blocksRes.ok) return null;
+    if (!blocksRes.ok) {
+      console.error(`[notion] Failed to fetch blocks: ${blocksRes.status} ${await blocksRes.text()}`);
+      return null;
+    }
 
     const blocksData = await blocksRes.json();
     const blocks: NotionBlock[] = blocksData.results ?? [];
@@ -77,6 +106,7 @@ export async function getNotionContext(
       .filter((line) => line.length > 0);
 
     const fullText = lines.join("\n").trim();
+    console.log(`[notion] Extracted ${fullText.length} chars from page`);
 
     // Cap at 4000 chars to give the AI enough context from transcripts
     if (fullText.length > 4000) {
@@ -84,7 +114,136 @@ export async function getNotionContext(
     }
 
     return fullText || null;
-  } catch {
+  } catch (err) {
+    console.error("[notion] Error fetching blocks:", err);
+    return null;
+  }
+}
+
+/**
+ * Finds databases the integration has access to,
+ * then queries them for pages where Contact Name matches.
+ */
+async function queryDatabaseByContactName(
+  token: string,
+  contactName: string
+): Promise<string | null> {
+  if (!contactName || contactName === "Unknown") return null;
+
+  try {
+    // First, find databases the integration can access
+    const searchRes = await fetch("https://api.notion.com/v1/search", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+      },
+      body: JSON.stringify({
+        filter: { property: "object", value: "database" },
+        page_size: 10,
+      }),
+    });
+
+    if (!searchRes.ok) {
+      console.error(`[notion] Database search failed: ${searchRes.status} ${await searchRes.text()}`);
+      return null;
+    }
+
+    const searchData = await searchRes.json();
+    const databases = searchData.results ?? [];
+    console.log(`[notion] Found ${databases.length} databases`);
+
+    // Query each database for the contact name
+    for (const db of databases) {
+      const dbId = db.id;
+      const properties = db.properties ?? {};
+
+      // Check if this database has a "Contact Name" property
+      const contactNameProp = Object.keys(properties).find(
+        (key) => key.toLowerCase().replace(/\s/g, "") === "contactname"
+      );
+
+      if (!contactNameProp) {
+        console.log(`[notion] Database ${dbId} has no Contact Name property, trying title search`);
+        // Try querying by title instead
+        const titleProp = Object.keys(properties).find(
+          (key) => properties[key].type === "title"
+        );
+        if (titleProp) {
+          const pageId = await queryDatabase(token, dbId, titleProp, contactName, "title");
+          if (pageId) return pageId;
+        }
+        continue;
+      }
+
+      console.log(`[notion] Querying database ${dbId} for Contact Name = "${contactName}"`);
+      const pageId = await queryDatabase(token, dbId, contactNameProp, contactName, properties[contactNameProp].type);
+      if (pageId) return pageId;
+    }
+
+    return null;
+  } catch (err) {
+    console.error("[notion] Database query error:", err);
+    return null;
+  }
+}
+
+async function queryDatabase(
+  token: string,
+  databaseId: string,
+  propertyName: string,
+  value: string,
+  propertyType: string
+): Promise<string | null> {
+  try {
+    // Build filter based on property type
+    let filter: Record<string, unknown>;
+    if (propertyType === "title") {
+      filter = {
+        property: propertyName,
+        title: { contains: value.split(" ")[0] }, // Search by first name
+      };
+    } else {
+      // rich_text type
+      filter = {
+        property: propertyName,
+        rich_text: { contains: value.split(" ")[0] },
+      };
+    }
+
+    const res = await fetch(
+      `https://api.notion.com/v1/databases/${databaseId}/query`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "Notion-Version": "2022-06-28",
+        },
+        body: JSON.stringify({
+          filter,
+          page_size: 5,
+          sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      console.error(`[notion] Database query failed: ${res.status} ${await res.text()}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const results = data.results ?? [];
+    console.log(`[notion] Database query returned ${results.length} results for "${value}"`);
+
+    if (results.length === 0) return null;
+
+    // Return the most recently edited matching page
+    return results[0].id;
+  } catch (err) {
+    console.error("[notion] Query error:", err);
     return null;
   }
 }
@@ -110,16 +269,20 @@ async function searchNotion(
       }),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[notion] Search failed: ${res.status} ${await res.text()}`);
+      return null;
+    }
 
     const data = await res.json();
     const results = data.results ?? [];
+    console.log(`[notion] Search for "${query}" returned ${results.length} results`);
 
     if (results.length === 0) return null;
 
-    // Return the best match — prefer pages where the title or properties match closely
     return results[0].id;
-  } catch {
+  } catch (err) {
+    console.error("[notion] Search error:", err);
     return null;
   }
 }
