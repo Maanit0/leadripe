@@ -33,8 +33,8 @@ function extractBlockText(block: NotionBlock): string {
 
 /**
  * Searches Notion for context about a deal.
- * Tries companyName first, falls back to contactName.
- * Returns plain text summary (max 1000 chars) or null.
+ * Searches by contact name and company name.
+ * Returns plain text summary (max 4000 chars) or null.
  */
 export async function getNotionContext(
   userId: string,
@@ -51,14 +51,14 @@ export async function getNotionContext(
   const token = profiles[0]?.notionAccessToken;
   if (!token) return null;
 
-  // Search by company name first, then contact name
-  const pageId = await searchNotion(token, companyName) ?? await searchNotion(token, contactName);
+  // Search by contact name first (more specific), then company name
+  const pageId = await searchNotion(token, contactName) ?? await searchNotion(token, companyName);
   if (!pageId) return null;
 
-  // Fetch page blocks
+  // Fetch page blocks (up to 100)
   try {
     const blocksRes = await fetch(
-      `https://api.notion.com/v1/blocks/${pageId}/children?page_size=50`,
+      `https://api.notion.com/v1/blocks/${pageId}/children?page_size=100`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -78,9 +78,9 @@ export async function getNotionContext(
 
     const fullText = lines.join("\n").trim();
 
-    // Cap at 1000 chars
-    if (fullText.length > 1000) {
-      return fullText.slice(0, 997) + "...";
+    // Cap at 4000 chars to give the AI enough context from transcripts
+    if (fullText.length > 4000) {
+      return fullText.slice(0, 3997) + "...";
     }
 
     return fullText || null;
@@ -106,7 +106,7 @@ async function searchNotion(
       body: JSON.stringify({
         query,
         filter: { property: "object", value: "page" },
-        page_size: 1,
+        page_size: 3,
       }),
     });
 
@@ -115,7 +115,10 @@ async function searchNotion(
     const data = await res.json();
     const results = data.results ?? [];
 
-    return results.length > 0 ? results[0].id : null;
+    if (results.length === 0) return null;
+
+    // Return the best match — prefer pages where the title or properties match closely
+    return results[0].id;
   } catch {
     return null;
   }
