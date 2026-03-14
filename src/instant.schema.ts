@@ -26,7 +26,7 @@ const schema = i.schema({
       contactEmail: i.string().optional(),
       contactRole: i.string().optional(),
       companyName: i.string(),
-      stage: i.string().indexed(), // replied_interested, demo_booked, demo_done, proposal_sent, gone_silent, stalled
+      stage: i.string().indexed(), // new_lead, outreach_sent, replied_interested, discovery_scheduled, discovery_done, follow_up, demo_scheduled, paid_client, gone_silent, not_a_fit
       lastTouchSummary: i.string().optional(),
       daysSinceLastTouch: i.number(),
       notionContext: i.string().optional(),

@@ -19,29 +19,53 @@ const STAGE_CONFIG: Record<
   string,
   { color: string; bg: string; dot: string; label: string }
 > = {
+  new_lead: {
+    color: "text-slate-700",
+    bg: "bg-slate-50 border-slate-200",
+    dot: "bg-slate-500",
+    label: "New lead",
+  },
+  outreach_sent: {
+    color: "text-blue-700",
+    bg: "bg-blue-50 border-blue-200",
+    dot: "bg-blue-500",
+    label: "Outreach sent",
+  },
   replied_interested: {
     color: "text-green-700",
     bg: "bg-green-50 border-green-200",
     dot: "bg-green-500",
     label: "Replied / interested",
   },
-  demo_booked: {
-    color: "text-blue-700",
-    bg: "bg-blue-50 border-blue-200",
-    dot: "bg-blue-500",
-    label: "Demo booked",
+  discovery_scheduled: {
+    color: "text-cyan-700",
+    bg: "bg-cyan-50 border-cyan-200",
+    dot: "bg-cyan-500",
+    label: "Discovery scheduled",
   },
-  demo_done: {
+  discovery_done: {
     color: "text-indigo-700",
     bg: "bg-indigo-50 border-indigo-200",
     dot: "bg-indigo-500",
-    label: "Demo done",
+    label: "Discovery done",
   },
-  proposal_sent: {
+  follow_up: {
     color: "text-amber-700",
     bg: "bg-amber-50 border-amber-200",
     dot: "bg-amber-500",
-    label: "Proposal sent",
+    label: "Follow up",
+  },
+  demo_scheduled: {
+    color: "text-purple-700",
+    bg: "bg-purple-50 border-purple-200",
+    dot: "bg-purple-500",
+    label: "Demo scheduled",
+  },
+  paid_client: {
+    color: "text-emerald-700",
+    bg: "bg-emerald-50 border-emerald-200",
+    dot: "bg-emerald-500",
+    label: "Paid client",
   },
   gone_silent: {
     color: "text-red-700",
@@ -49,17 +73,11 @@ const STAGE_CONFIG: Record<
     dot: "bg-red-500",
     label: "Gone silent",
   },
-  stalled: {
-    color: "text-gray-700",
+  not_a_fit: {
+    color: "text-gray-500",
     bg: "bg-gray-50 border-gray-200",
-    dot: "bg-gray-500",
-    label: "Stalled",
-  },
-  nurture: {
-    color: "text-purple-700",
-    bg: "bg-purple-50 border-purple-200",
-    dot: "bg-purple-500",
-    label: "Nurture",
+    dot: "bg-gray-400",
+    label: "Not a fit",
   },
 };
 
@@ -72,11 +90,13 @@ const DEFAULT_STAGE = {
 
 const ACTIVE_STAGES = [
   "gone_silent",
-  "stalled",
-  "proposal_sent",
-  "demo_done",
-  "demo_booked",
+  "follow_up",
+  "discovery_done",
+  "outreach_sent",
   "replied_interested",
+  "discovery_scheduled",
+  "demo_scheduled",
+  "new_lead",
 ];
 
 function DraftContent({ id }: { id: string }) {

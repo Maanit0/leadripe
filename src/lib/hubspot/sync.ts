@@ -6,20 +6,36 @@ import type { ClassifyReplyOutput } from "@/lib/ai/types";
 
 // Map HubSpot pipeline stage IDs/labels to our internal stage names.
 const STAGE_MAP: Record<string, string> = {
-  appointmentscheduled: "demo_booked",
-  qualifiedtobuy: "replied_interested",
-  presentationscheduled: "demo_booked",
-  decisionmakerboughtin: "demo_done",
-  contractsent: "proposal_sent",
-  closedwon: "closed_won",
-  closedlost: "closed_lost",
-  demo_booked: "demo_booked",
-  demo_done: "demo_done",
-  proposal_sent: "proposal_sent",
+  // HubSpot stage labels (normalized: lowercase, no spaces/dashes/underscores)
+  newlead: "new_lead",
+  outreachsent: "outreach_sent",
+  repliedinterested: "replied_interested",
+  discoveryscheduled: "discovery_scheduled",
+  discoverydone: "discovery_done",
+  followup: "follow_up",
+  demoscheduled: "demo_scheduled",
+  paidclient: "paid_client",
+  gonesilent: "gone_silent",
+  notafit: "not_a_fit",
+  // Also accept our internal names directly
+  new_lead: "new_lead",
+  outreach_sent: "outreach_sent",
   replied_interested: "replied_interested",
+  discovery_scheduled: "discovery_scheduled",
+  discovery_done: "discovery_done",
+  follow_up: "follow_up",
+  demo_scheduled: "demo_scheduled",
+  paid_client: "paid_client",
   gone_silent: "gone_silent",
-  stalled: "stalled",
-  nurture: "nurture",
+  not_a_fit: "not_a_fit",
+  // Legacy HubSpot default stages
+  appointmentscheduled: "discovery_scheduled",
+  qualifiedtobuy: "replied_interested",
+  presentationscheduled: "demo_scheduled",
+  decisionmakerboughtin: "discovery_done",
+  contractsent: "paid_client",
+  closedwon: "paid_client",
+  closedlost: "not_a_fit",
 };
 
 function mapStage(hubspotStage: string): string {
@@ -193,13 +209,16 @@ export async function syncHubspotDeals(userId: string): Promise<{
 
 // Reverse map: our internal stage -> HubSpot default stage ID
 const REVERSE_STAGE_MAP: Record<string, string> = {
-  replied_interested: "qualifiedtobuy",
-  demo_booked: "appointmentscheduled",
-  demo_done: "decisionmakerboughtin",
-  proposal_sent: "contractsent",
-  closed_won: "closedwon",
-  closed_lost: "closedlost",
-  nurture: "qualifiedtobuy",
+  new_lead: "newlead",
+  outreach_sent: "outreachsent",
+  replied_interested: "repliedinterested",
+  discovery_scheduled: "discoveryscheduled",
+  discovery_done: "discoverydone",
+  follow_up: "followup",
+  demo_scheduled: "demoscheduled",
+  paid_client: "paidclient",
+  gone_silent: "gonesilent",
+  not_a_fit: "notafit",
 };
 
 /**

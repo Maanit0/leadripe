@@ -25,7 +25,7 @@ Action: move deal to replied_interested. Set send_calendar_invite: true if they 
 
 CALENDAR_ACCEPTED
 This is a Google Calendar acceptance notification email. The lead has accepted a calendar invite.
-Action: move deal to demo_booked. Set send_calendar_invite: false.
+Action: move deal to discovery_scheduled. Set send_calendar_invite: false.
 
 CALENDAR_DECLINED
 This is a Google Calendar decline notification. The lead declined the invite.
@@ -41,11 +41,11 @@ Action: do not advance stage. Queue a response draft that addresses the specific
 
 NEGATIVE
 The lead said no, asked to be removed, said it is not a fit, or is clearly not interested.
-Action: move deal to closed_lost. Set send_calendar_invite: false.
+Action: move deal to not_a_fit. Set send_calendar_invite: false.
 
 NOT_NOW
 The lead is interested but the timing is wrong. They said "check back in Q3", "we are in a freeze right now", "ask me again in a few months."
-Action: move deal to nurture. Set follow_up_date to approximately 60 days from today. Set send_calendar_invite: false.
+Action: keep deal at current stage. Set follow_up_date to approximately 60 days from today. Set send_calendar_invite: false.
 
 UNCLEAR
 The reply is ambiguous. Could be positive or negative. Cannot determine intent with confidence.
@@ -61,7 +61,7 @@ CALENDAR INVITE LOGIC:
 
 Only set send_calendar_invite: true when:
 - intent is POSITIVE_ADVANCE
-- AND the deal is not already at demo_booked or beyond
+- AND the deal is not already at discovery_scheduled or beyond
 
 If the lead mentioned a specific time or day in their reply, extract it and return it as suggested_slot in natural language (e.g. "Thursday afternoon", "Monday at 2pm"). The agent will resolve this against the sender's real calendar availability.
 
@@ -78,7 +78,7 @@ Return a single JSON object. No explanation, no markdown, no extra text. Just th
 {
   "intent": "POSITIVE_ADVANCE",
   "confidence": "high" | "medium" | "low",
-  "suggested_stage": "replied_interested" | "demo_booked" | "closed_lost" | "nurture" | "no_change",
+  "suggested_stage": "new_lead" | "outreach_sent" | "replied_interested" | "discovery_scheduled" | "discovery_done" | "follow_up" | "demo_scheduled" | "paid_client" | "gone_silent" | "not_a_fit" | "no_change",
   "send_calendar_invite": true | false,
   "suggested_slot": "Thursday afternoon" | null,
   "objection_summary": "concerned about price" | null,
@@ -140,29 +140,37 @@ PIPELINE STAGES AND GOALS:
 
 Use the deal_stage to determine the goal and writing principles for this message.
 
+[new_lead]
+Goal: introduce yourself and spark curiosity. Get a reply.
+Principles: keep it short and personal. Reference something specific about them or their company from notion_context. Ask one clear question. Do not pitch. Do not attach anything.
+
+[outreach_sent]
+Goal: get a reply to your initial outreach.
+Principles: do not repeat the first message. Try a different angle. Reference a pain point from notion_context if available. Keep it to 2-3 sentences. Make it easy to reply with a yes or no.
+
 [replied_interested]
-Goal: confirm a demo and lock in a time.
-Principles: they already said yes, do not re-sell. Just make it easy to book. Propose 2 specific times from available_slots, then offer calendly_link as fallback. Keep it under 4 sentences.
+Goal: book a discovery call and lock in a time.
+Principles: they already showed interest, do not re-sell. Just make it easy to book. Propose 2 specific times from available_slots, then offer calendly_link as fallback. Keep it under 4 sentences.
 
-[demo_booked]
+[discovery_scheduled]
+Goal: confirm attendance, reduce no-show risk.
+Principles: short reminder. Mention one specific thing you want to learn about their situation based on notion_context. Frame it as a conversation, not a pitch.
+
+[discovery_done]
+Goal: follow up on insights from the call and propose a clear next step.
+Principles: reference specific things they said in the call from notion_context or previous_messages_sent. Acknowledge their pain points. Propose a concrete next step (another call, intro to teammate, share something relevant). Do not be vague.
+
+[follow_up]
+Goal: re-engage and move toward the next milestone.
+Principles: reference the last conversation from notion_context. Share something valuable (insight from other customers, relevant article, answer to a question they raised). Then propose a next step. Keep it natural.
+
+[demo_scheduled]
 Goal: confirm attendance, build anticipation, reduce no-show risk.
-Principles: short reminder 24hrs before. Mention one specific thing you are excited to show them based on notion_context. No hard sell.
-
-[demo_done]
-Goal: get a clear yes on sending a proposal or moving to next step.
-Principles: reference something specific from the demo call in notion_context. Make the ask concrete. "Can I send a proposal over by Thursday?" not "let me know if you want to move forward."
-
-[proposal_sent]
-Goal: get a decision, or surface and unblock any objections.
-Principles: do not just ask "any thoughts?" Make it easy to say yes OR voice concerns. "Happy to adjust scope/pricing if anything felt off." Give them an out that keeps the door open.
+Principles: short reminder. Mention one specific thing you are excited to show them based on their pain points from notion_context. No hard sell.
 
 [gone_silent]
 Goal: get any response. Re-open the conversation.
 Principles: acknowledge the silence without being passive aggressive. Give them an easy out ("if timing has shifted, totally fine"). If days_since_last_touch > 14, propose fresh available_slots + calendly_link to make re-engaging frictionless.
-
-[stalled]
-Goal: force a clear yes, no, or not-now. Stop wasting both parties' time.
-Principles: be direct and kind. "I don't want to keep cluttering your inbox if the timing isn't right. Is this still something worth exploring, or should I check back in Q3?" One question, easy to answer.
 
 ---
 

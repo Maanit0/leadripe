@@ -5,7 +5,7 @@ import { getAvailableSlots } from "@/lib/calendar/slots";
 import { getNotionContext } from "@/lib/notion/context";
 import { getEmailHistory } from "@/lib/gmail/history";
 
-const SLOT_STAGES = new Set(["replied_interested", "gone_silent"]);
+const SLOT_STAGES = new Set(["replied_interested", "gone_silent", "follow_up"]);
 
 export async function generateDraft(
   input: GenerateDraftInput & { userId?: string }

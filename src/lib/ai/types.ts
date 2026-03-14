@@ -30,10 +30,16 @@ export interface ClassifyReplyOutput {
   intent: IntentType;
   confidence: Confidence;
   suggested_stage:
+    | "new_lead"
+    | "outreach_sent"
     | "replied_interested"
-    | "demo_booked"
-    | "closed_lost"
-    | "nurture"
+    | "discovery_scheduled"
+    | "discovery_done"
+    | "follow_up"
+    | "demo_scheduled"
+    | "paid_client"
+    | "gone_silent"
+    | "not_a_fit"
     | "no_change";
   send_calendar_invite: boolean;
   suggested_slot: string | null;
