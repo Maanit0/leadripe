@@ -17,8 +17,9 @@ export async function generateDraft(
   if (!notionContext && input.userId && input.company_name) {
     try {
       notionContext = await getNotionContext(input.userId, input.company_name, input.contact_name) ?? "";
-    } catch {
-      // Non-fatal
+      console.log(`[draft] Notion context for ${input.contact_name} (${input.company_name}): ${notionContext ? `${notionContext.length} chars` : "NOT FOUND"}`);
+    } catch (err) {
+      console.error(`[draft] Notion fetch error for ${input.contact_name}:`, err);
     }
   }
 
@@ -42,8 +43,9 @@ export async function generateDraft(
   if (previousMessages.length === 0 && input.userId && input.contact_email) {
     try {
       previousMessages = await getEmailHistory(input.userId, input.contact_email);
-    } catch {
-      // Non-fatal
+      console.log(`[draft] Gmail history for ${input.contact_name} (${input.contact_email}): ${previousMessages.length} messages`);
+    } catch (err) {
+      console.error(`[draft] Gmail fetch error for ${input.contact_name}:`, err);
     }
   }
 
