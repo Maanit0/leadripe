@@ -183,7 +183,7 @@ function DraftContent({ id }: { id: string }) {
           dealId: deal.id,
           to: deal.contactEmail,
           subject: `Following up - ${deal.companyName}`,
-          body: editedText,
+          emailBody: editedText,
         }),
       });
       if (res.ok) {
