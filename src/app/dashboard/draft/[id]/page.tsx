@@ -107,6 +107,14 @@ function DraftContent({ id }: { id: string }) {
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sources, setSources] = useState<{
+    notionFound: boolean;
+    notionChars: number;
+    gmailFound: boolean;
+    gmailMessageCount: number;
+    hubspotStage: string;
+    calendarSlots: number;
+  } | null>(null);
 
   // Query the deal, messages, and profile from InstantDB
   const { data, isLoading } = db.useQuery(
@@ -174,8 +182,9 @@ function DraftContent({ id }: { id: string }) {
           }),
         });
         if (res.ok) {
-          const { body } = await res.json();
-          setEditedText(body);
+          const data = await res.json();
+          setEditedText(data.body);
+          if (data.sources) setSources(data.sources);
         } else {
           console.error("Draft generation failed:", await res.text());
         }
@@ -474,6 +483,33 @@ function DraftContent({ id }: { id: string }) {
             )}
           </div>
         </div>
+
+        {/* Sources panel */}
+        {sources && !generating && (
+          <div className="flex flex-col gap-2 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Context used</span>
+            <div className="flex flex-wrap gap-3">
+              <div className={`flex items-center gap-1.5 text-xs ${sources.gmailFound ? "text-green-700" : "text-gray-400"}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${sources.gmailFound ? "bg-green-500" : "bg-gray-300"}`} />
+                Gmail {sources.gmailFound ? `(${sources.gmailMessageCount} emails)` : "(no emails found)"}
+              </div>
+              <div className={`flex items-center gap-1.5 text-xs ${sources.notionFound ? "text-green-700" : "text-gray-400"}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${sources.notionFound ? "bg-green-500" : "bg-gray-300"}`} />
+                Notion {sources.notionFound ? `(${sources.notionChars} chars)` : "(no page found)"}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-green-700">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                HubSpot ({(STAGE_CONFIG[sources.hubspotStage] ?? DEFAULT_STAGE).label})
+              </div>
+              {sources.calendarSlots > 0 && (
+                <div className="flex items-center gap-1.5 text-xs text-green-700">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  Calendar ({sources.calendarSlots} slots)
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Bottom actions */}
         <div className="flex items-center justify-between pt-1">

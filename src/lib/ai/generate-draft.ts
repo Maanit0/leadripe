@@ -74,5 +74,15 @@ export async function generateDraft(
   const body =
     response.content[0].type === "text" ? response.content[0].text.trim() : "";
 
-  return { body };
+  return {
+    body,
+    sources: {
+      notionFound: notionContext.length > 0,
+      notionChars: notionContext.length,
+      gmailFound: previousMessages.length > 0,
+      gmailMessageCount: previousMessages.length,
+      hubspotStage: input.deal_stage,
+      calendarSlots: slots.length,
+    },
+  };
 }

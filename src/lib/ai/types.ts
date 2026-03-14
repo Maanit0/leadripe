@@ -71,6 +71,16 @@ export interface GenerateDraftInput {
   tone: Tone;
 }
 
+export interface DraftSources {
+  notionFound: boolean;
+  notionChars: number;
+  gmailFound: boolean;
+  gmailMessageCount: number;
+  hubspotStage: string;
+  calendarSlots: number;
+}
+
 export interface GenerateDraftOutput {
   body: string;
+  sources?: DraftSources;
 }
