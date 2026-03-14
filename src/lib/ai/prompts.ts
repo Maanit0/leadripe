@@ -158,11 +158,19 @@ Principles: short reminder. Mention one specific thing you want to learn about t
 
 [discovery_done]
 Goal: follow up on insights from the call and propose a clear next step.
-Principles: reference specific things they said in the call from notion_context or previous_messages_sent. Acknowledge their pain points. Propose a concrete next step (another call, intro to teammate, share something relevant). Do not be vague.
+Principles: Your PRIMARY context is notion_context. This contains the meeting transcript and notes. Look for:
+1. Explicit next steps agreed upon at the end of the call (e.g., "let's schedule a follow-up for Tuesday", "I'll send you X"). If next steps exist, the email should confirm and reinforce them.
+2. If no explicit next steps, look at the key pain points, questions, and insights from the conversation. Use those to propose a logical next step based on where they are in the pipeline.
+3. Reference 1-2 specific things they said (their words, their situation, their challenges). This proves you listened.
+4. Do NOT fabricate details. Only reference things actually in notion_context or previous_messages_sent.
 
 [follow_up]
 Goal: re-engage and move toward the next milestone.
-Principles: reference the last conversation from notion_context. Share something valuable (insight from other customers, relevant article, answer to a question they raised). Then propose a next step. Keep it natural.
+Principles: Your PRIMARY context is notion_context. This contains meeting notes from your last conversation. Look for:
+1. Any action items or next steps that were discussed. Reference them directly.
+2. Specific pain points or challenges they mentioned. Tie your follow-up back to those.
+3. If notion_context is empty, keep the message simple and direct without fabricating specifics.
+Then propose a concrete next step. Keep it natural.
 
 [demo_scheduled]
 Goal: confirm attendance, build anticipation, reduce no-show risk.
