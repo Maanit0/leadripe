@@ -2,6 +2,8 @@ import { getAnthropicClient } from "./client";
 import { DRAFT_WRITER_PROMPT } from "./prompts";
 import type { GenerateDraftInput, GenerateDraftOutput } from "./types";
 import { getAvailableSlots } from "@/lib/calendar/slots";
+import { getNotionContext } from "@/lib/notion/context";
+import { getEmailHistory } from "@/lib/gmail/history";
 
 const SLOT_STAGES = new Set(["replied_interested", "gone_silent"]);
 
@@ -9,6 +11,16 @@ export async function generateDraft(
   input: GenerateDraftInput & { userId?: string }
 ): Promise<GenerateDraftOutput> {
   const client = getAnthropicClient();
+
+  // Fetch Notion context live if not already provided
+  let notionContext = input.notion_context ?? "";
+  if (!notionContext && input.userId && input.company_name) {
+    try {
+      notionContext = await getNotionContext(input.userId, input.company_name, input.contact_name) ?? "";
+    } catch {
+      // Non-fatal
+    }
+  }
 
   // Fetch real calendar slots for stages that need them
   let slots = input.available_slots ?? [];
@@ -25,6 +37,16 @@ export async function generateDraft(
     }
   }
 
+  // Fetch Gmail conversation history if contact email is available
+  let previousMessages = input.previous_messages_sent ?? [];
+  if (previousMessages.length === 0 && input.userId && input.contact_email) {
+    try {
+      previousMessages = await getEmailHistory(input.userId, input.contact_email);
+    } catch {
+      // Non-fatal
+    }
+  }
+
   const userMessage = JSON.stringify({
     deal_stage: input.deal_stage,
     contact_name: input.contact_name,
@@ -32,10 +54,10 @@ export async function generateDraft(
     company_name: input.company_name,
     last_touch_summary: input.last_touch_summary,
     days_since_last_touch: input.days_since_last_touch,
-    notion_context: input.notion_context ?? "",
+    notion_context: notionContext,
     available_slots: slots,
     calendly_link: calendlyLink,
-    previous_messages_sent: input.previous_messages_sent ?? [],
+    previous_messages_sent: previousMessages,
     sender_name: input.sender_name,
     tone: input.tone,
   });

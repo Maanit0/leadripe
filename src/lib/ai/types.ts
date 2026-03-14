@@ -54,6 +54,7 @@ export interface GenerateDraftInput {
   contact_name: string;
   contact_role: string;
   company_name: string;
+  contact_email?: string;
   last_touch_summary: string;
   days_since_last_touch: number;
   notion_context?: string;

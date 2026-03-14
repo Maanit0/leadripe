@@ -88,12 +88,13 @@ function DraftContent({ id }: { id: string }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
-  // Query the deal and all active deals from InstantDB
+  // Query the deal, messages, and profile from InstantDB
   const { data, isLoading } = db.useQuery(
     user
       ? {
           deals: {
             $: { where: { "user.id": user.id } },
+            messages: {},
           },
           profiles: {
             $: { where: { "user.id": user.id } },
@@ -105,6 +106,12 @@ function DraftContent({ id }: { id: string }) {
   const deals = data?.deals ?? [];
   const deal = deals.find((d) => d.id === id);
   const profile = data?.profiles?.[0];
+
+  // Get previous messages for this deal, sorted by time
+  const dealMessages = (deal as unknown as { messages?: Array<{ body: string; direction: string; createdAt: number }> })?.messages ?? [];
+  const previousMessages = [...dealMessages]
+    .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
+    .map((m) => `[${m.direction}] ${m.body}`);
 
   // Sort active deals by urgency to find "next deal"
   const activeDealsSorted = [...deals]
@@ -136,9 +143,11 @@ function DraftContent({ id }: { id: string }) {
             contact_name: deal.contactName,
             contact_role: deal.contactRole ?? "",
             company_name: deal.companyName,
+            contact_email: deal.contactEmail ?? "",
             last_touch_summary: deal.lastTouchSummary ?? "",
             days_since_last_touch: deal.daysSinceLastTouch ?? 0,
             notion_context: deal.notionContext ?? "",
+            previous_messages_sent: previousMessages,
             calendly_link: (profile?.calendlyLink as string) ?? "",
             sender_name: user.displayName?.split(" ")[0] ?? "Me",
             tone: selectedTone,
